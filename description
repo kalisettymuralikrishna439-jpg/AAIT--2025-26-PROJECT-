@@ -1,0 +1,16 @@
+📁 Dataset Analysis & Preprocessing
+⚠️ Critical Dataset Limitations
+Severe Class Imbalance: The training set is heavily skewed toward Pneumonia cases. To prevent the model from simply "guessing" the majority class, I implemented oversampling via targeted data augmentation.
+Stunted Validation Set: With only 16 images, the default validation folder is statistically insignificant. Strategy: I merged these into the training pool and transitioned to K-Fold Cross-Validation for more robust performance metrics.
+Data Scarcity (N ≈ 5k): 5,000 images is a small sample for deep learning. Instead of training from scratch, I utilized Transfer Learning to leverage features already learned from millions of generic images (ImageNet).
+Demographic Bias: Since all data originates from Guangzhou Women and Children’s Medical Center, the model may carry geographic and pediatric biases. It should be viewed as a "proof of concept" rather than a global diagnostic tool.
+Lack of Metadata: The absence of clinical history (age, symptoms, smoking status) means the model relies purely on visual artifacts. Future iterations would benefit from a Multi-Modal approach coupling images with electronic health records (EHR).
+⚙️ Data Preprocessing Pipeline
+Uniform Resizing: Standardized all inputs to 224x224 to meet the requirements of the ResNet architecture.
+Channel Uniformity: While X-rays are inherently grayscale, they are loaded as 3-channel RGB. This allows the model to utilize pretrained weights from architectures designed for color images without losing spatial information.
+Pixel Normalization: Scaled intensity values from [0, 255] to [0, 1]. This ensures faster convergence and prevents "exploding gradients" during the backpropagation phase.
+Binary Encoding: Converted categorical strings into a machine-readable format:
+0: Normal
+1: Pneumonia
+Synthetic Minority Oversampling: Applied random rotations, horizontal flips, and zooms exclusively to the training set to balance class distribution and improve generalization on unseen data.
+Next Steps:
