@@ -1,1 +1,170 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+import cv2
+import os
+import numpy as np 
+import pandas as pd
+from PIL import Image
+def get_training_data(data_dir, img_size=(224, 224)):
+    data = []
+    labels = []
+    
+    for label in os.listdir(data_dir):
+        label_path = os.path.join(data_dir, label)
+        if not os.path.isdir(label_path):
+            continue
+        for img_file in os.listdir(label_path):
+            img_path = os.path.join(label_path, img_file)
+            try:
+                img = Image.open(img_path).convert('RGB')
+                img = img.resize(img_size)          # <-- fix: resize here
+                data.append(np.array(img))
+                labels.append(label)
+            except Exception as e:
+                print(e)
+    
+    return np.array(data), np.array(labels)  # <-- also return labels separately
+train_data, train_labels = get_training_data('/kaggle/input/datasets/paultimothymooney/chest-xray-pneumonia/chest_xray/train')
+test_data,  test_labels  = get_training_data('/kaggle/input/datasets/paultimothymooney/chest-xray-pneumonia/chest_xray/test')
+val_data,   val_labels   = get_training_data('/kaggle/input/datasets/paultimothymooney/chest-xray-pneumonia/chest_xray/val')
+train_data.shape,train_labels.shape
+((5216, 224, 224, 3), (5216,))
+l = []
+for i in train_labels:
+    if(i == 'PNEUMONIA'):
+        l.append("Pneumonia")
+    else:
+        l.append("Normal")
+# Set seaborn style and plot label distribution
+sns.set_style('darkgrid')
+ax = sns.countplot(x=l)
 
+# Annotate count above each bar
+for p in ax.patches:
+    ax.annotate(
+        f'{int(p.get_height())}',
+        (p.get_x() + p.get_width() / 2., p.get_height()),
+        ha='center', va='bottom',
+        fontsize=12, fontweight='bold'
+    )
+
+plt.title("Train Labels")
+plt.xlabel("Class")
+plt.ylabel("Count")
+plt.show()
+
+test_data.shape,test_labels.shape
+((624, 224, 224, 3), (624,))
+l = []
+for i in test_labels:
+    if(i == 'PNEUMONIA'):
+        l.append("Pneumonia")
+    else:
+        l.append("Normal")
+# Set seaborn style and plot label distribution
+sns.set_style('darkgrid')
+ax = sns.countplot(x=l)
+
+# Annotate count above each bar
+for p in ax.patches:
+    ax.annotate(
+        f'{int(p.get_height())}',
+        (p.get_x() + p.get_width() / 2., p.get_height()),
+        ha='center', va='bottom',
+        fontsize=12, fontweight='bold'
+    )
+
+plt.title("Test Labels")
+plt.xlabel("Class")
+plt.ylabel("Count")
+plt.show()
+
+val_data.shape,val_labels.shape
+((16, 224, 224, 3), (16,))
+l = []
+for i in val_labels:
+    if(i == 'PNEUMONIA'):
+        l.append("Pneumonia")
+    else:
+        l.append("Normal")
+# Set seaborn style and plot label distribution
+sns.set_style('darkgrid')
+ax = sns.countplot(x=l)
+
+# Annotate count above each bar
+for p in ax.patches:
+    ax.annotate(
+        f'{int(p.get_height())}',
+        (p.get_x() + p.get_width() / 2., p.get_height()),
+        ha='center', va='bottom',
+        fontsize=12, fontweight='bold'
+    )
+
+plt.title("Val Labels")
+plt.xlabel("Class")
+plt.ylabel("Count")
+plt.show()
+
+fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+axes = axes.flatten()
+
+for i, ax in enumerate(axes):
+    idx = np.random.randint(0, len(test_data))
+    ax.imshow(test_data[idx])
+    ax.set_title(f"Label: {test_labels[idx]}")
+    ax.axis('off')
+
+plt.suptitle("Sample Instances from Test Set", fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+# Limitations, Crucial Class Imbalance in Training Set - Will Require OverSampling Using Augmentation
+# Extremely Small Validation Set - Will be used for a sanity check - mainly will depend on training set for cv 
+# Limited DataSet Size - 5k+ Samples is relatively small - That's why the main approach will be Transfer Learning NOT Learning From Scratch 
+# Potential Bias - All images were collected from Guangzhou Women and Children
+# No additonal Meta data - will lack independancy & will need to be furtherly coupled & finetuned with extra medical records with there Xray Scans
+Dataset Limitations
+1. Crucial Class Imbalance in Training Set
+The training set is heavily imbalanced, with significantly more Pneumonia images than Normal images. This can bias the model toward predicting Pneumonia more frequently. This will be addressed through oversampling via data augmentation to balance the class distribution during training.
+
+2. Extremely Small Validation Set
+The validation set contains only 16 images, making it statistically unreliable for meaningful evaluation. It will be used only as a sanity check during training. The primary validation strategy will rely on cross-validation applied to the training set.
+
+3. Limited Dataset Size
+With approximately 5,000+ samples, the dataset is relatively small by deep learning standards, increasing the risk of overfitting. For this reason, the main approach will be Transfer Learning rather than training a model from scratch, leveraging pretrained weights to compensate for the limited data size.
+
+4. Potential Geographic & Demographic Bias
+All images were collected from a single source — Guangzhou Women and Children's Medical Center — representing one geographic location and a specific demographic group. This limits the model's ability to generalize across different populations, age groups, and medical imaging equipment.
+
+5. No Additional Patient Metadata
+The dataset contains only X-ray images with no accompanying clinical information such as age, symptoms, or medical history. This limits the model's independence and real-world applicability. For a more robust clinical tool, the model would need to be further coupled and fine-tuned with additional medical records alongside the X-ray scans.
+
+# ============================================================
+# DATA PREPROCESSING PIPELINE
+
+# ---- Step 1: Resize to 224x224 ----
+# All images are resized to 224x224 during loading to ensure
+# homogeneous input dimensions required by the ResNet architecture
+
+# ---- Step 2: Grayscale OR RGB Based on Model Requirements ----
+# RGB format is preserved (.convert('RGB')) to match ResNet's
+# 3-channel input requirements. Chest X-rays are naturally grayscale
+# but are loaded as RGB where all 3 channels carry identical values
+
+# ---- Step 3: Normalize Pixel Values ----
+# Pixel values are scaled from [0, 255] to [0, 1] by dividing by 255
+# This stabilizes gradient updates and accelerates model convergence
+
+# ---- Step 4: Encode Labels ----
+# String labels (NORMAL / PNEUMONIA) are encoded to binary integers
+# (0 = Normal, 1 = Pneumonia) for model compatibility
+
+# ---- Step 5: Merge Validation Set into Training Set ----
+# The validation set contains only 16 images and is statistically
+# unreliable. It will be merged into the training set and cross-validation
+# will be used instead for proper model evaluation during training
+
+# ---- Step 6: Oversample via Augmentation ----
+# Data augmentation (rotation, flipping, shifting, zoom) 
+# to the minority class to balance distribution and prevent model bias
+# Augmentation is applied only to training data 
